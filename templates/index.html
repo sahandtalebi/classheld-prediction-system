@@ -1,0 +1,282 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="form-card">
+            <div class="card-header">
+                <h3><i class="bi bi-input-cursor"></i> ورود اطلاعات</h3>
+            </div>
+            <form id="prediction-form">
+                <div class="mb-3">
+                    <label for="weather" class="form-label feature-label">وضعیت آب و هوا:</label>
+                    <select class="form-select" id="weather" name="weather" required>
+                        <option value="" selected disabled>انتخاب کنید...</option>
+                        <option value="Sunny">آفتابی</option>
+                        <option value="Cloudy">ابری</option>
+                        <option value="Rainy">بارانی</option>
+                        <option value="Snowy">برفی</option>
+                        <option value="Stormy">طوفانی</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="temperature" class="form-label feature-label">دما (درجه سانتیگراد):</label>
+                    <input type="number" class="form-control" id="temperature" name="temperature" min="-30" max="50" step="0.1" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="day" class="form-label feature-label">روز هفته:</label>
+                    <select class="form-select" id="day" name="day" required>
+                        <option value="" selected disabled>انتخاب کنید...</option>
+                        <option value="Monday">دوشنبه</option>
+                        <option value="Tuesday">سه‌شنبه</option>
+                        <option value="Wednesday">چهارشنبه</option>
+                        <option value="Thursday">پنج‌شنبه</option>
+                        <option value="Friday">جمعه</option>
+                        <option value="Saturday">شنبه</option>
+                        <option value="Sunday">یکشنبه</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="time" class="form-label feature-label">ساعت کلاس:</label>
+                    <select class="form-select" id="time" name="time" required>
+                        <option value="" selected disabled>انتخاب کنید...</option>
+                        {% for hour in range(8, 19) %}
+                        <option value="{{ '%02d' % hour }}:00">{{ '%02d' % hour }}:00</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="professor_status" class="form-label feature-label">وضعیت استاد:</label>
+                    <select class="form-select" id="professor_status" name="professor_status" required>
+                        <option value="" selected disabled>انتخاب کنید...</option>
+                        <option value="Available">در دسترس</option>
+                        <option value="Sick">بیمار</option>
+                        <option value="Conference">در کنفرانس</option>
+                        <option value="Personal_Leave">مرخصی شخصی</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label feature-label">آیا امروز تعطیل رسمی است؟</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="is_holiday" id="holiday-yes" value="true">
+                        <label class="form-check-label" for="holiday-yes">بله</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="is_holiday" id="holiday-no" value="false" checked>
+                        <label class="form-check-label" for="holiday-no">خیر</label>
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">پیش‌بینی کن</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div id="results-container" style="display:none;">
+            <div class="result-card">
+                <div class="card-header">
+                    <h3><i class="bi bi-graph-up"></i> نتیجه پیش‌بینی</h3>
+                </div>
+                
+                <div id="prediction-result">
+                    <!-- Prediction result will be displayed here -->
+                </div>
+                
+                <div class="mt-4">
+                    <h4>جزئیات احتمالات:</h4>
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <span class="feature-label">احتمال برگزاری:</span>
+                        </div>
+                        <div class="col-6 text-end">
+                            <span id="probability-held"></span>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <span class="feature-label">احتمال لغو:</span>
+                        </div>
+                        <div class="col-6 text-end">
+                            <span id="probability-cancelled"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center mt-4 mb-2">
+                        <img id="plot-image" class="img-fluid" src="" alt="نمودار احتمالات">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="result-card">
+                <div class="card-header">
+                    <h3><i class="bi bi-info-circle"></i> اطلاعات ورودی</h3>
+                </div>
+                
+                <div id="features-info">
+                    <!-- Features info will be displayed here -->
+                </div>
+            </div>
+        </div>
+        
+        <div id="loading-container" style="display:none;">
+            <div class="text-center my-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">در حال بارگذاری...</span>
+                </div>
+                <p class="mt-2">در حال پردازش اطلاعات...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Dictionary for translating weather conditions
+    const weatherTranslations = {
+        'Sunny': 'آفتابی',
+        'Cloudy': 'ابری',
+        'Rainy': 'بارانی',
+        'Snowy': 'برفی',
+        'Stormy': 'طوفانی'
+    };
+    
+    // Dictionary for translating days
+    const dayTranslations = {
+        'Monday': 'دوشنبه',
+        'Tuesday': 'سه‌شنبه',
+        'Wednesday': 'چهارشنبه',
+        'Thursday': 'پنج‌شنبه',
+        'Friday': 'جمعه',
+        'Saturday': 'شنبه',
+        'Sunday': 'یکشنبه'
+    };
+    
+    // Dictionary for translating professor status
+    const professorTranslations = {
+        'Available': 'در دسترس',
+        'Sick': 'بیمار',
+        'Conference': 'در کنفرانس',
+        'Personal_Leave': 'مرخصی شخصی'
+    };
+    
+    // Handle form submission
+    $('#prediction-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        // Show loading
+        $('#results-container').hide();
+        $('#loading-container').show();
+        
+        // Get form data
+        const formData = $(this).serialize();
+        
+        // Send prediction request
+        $.ajax({
+            url: '/predict',
+            method: 'POST',
+            data: formData,
+            dataType: 'json',
+            success: function(response) {
+                // Hide loading
+                $('#loading-container').hide();
+                
+                // Update prediction result
+                let resultHTML = '';
+                if (response.prediction) {
+                    resultHTML = `
+                        <div class="prediction-box held">
+                            <div class="prediction-icon"><i class="bi bi-check-circle-fill"></i></div>
+                            <h2>کلاس برگزار می‌شود</h2>
+                            <p>با احتمال ${(response.probability_held * 100).toFixed(1)}%</p>
+                        </div>
+                    `;
+                } else {
+                    resultHTML = `
+                        <div class="prediction-box cancelled">
+                            <div class="prediction-icon"><i class="bi bi-x-circle-fill"></i></div>
+                            <h2>کلاس لغو می‌شود</h2>
+                            <p>با احتمال ${(response.probability_cancelled * 100).toFixed(1)}%</p>
+                        </div>
+                    `;
+                }
+                $('#prediction-result').html(resultHTML);
+                
+                // Update probabilities
+                $('#probability-held').text(`${(response.probability_held * 100).toFixed(1)}%`);
+                $('#probability-cancelled').text(`${(response.probability_cancelled * 100).toFixed(1)}%`);
+                
+                // Update plot image
+                $('#plot-image').attr('src', 'data:image/png;base64,' + response.plot_image);
+                
+                // Update features info
+                const features = response.features;
+                const featuresHTML = `
+                    <div class="row">
+                        <div class="col-6 mb-2">
+                            <span class="feature-label">وضعیت آب و هوا:</span>
+                        </div>
+                        <div class="col-6 mb-2 text-end">
+                            ${weatherTranslations[features.Weather]}
+                        </div>
+                        
+                        <div class="col-6 mb-2">
+                            <span class="feature-label">دما:</span>
+                        </div>
+                        <div class="col-6 mb-2 text-end">
+                            ${features.Temperature} °C
+                        </div>
+                        
+                        <div class="col-6 mb-2">
+                            <span class="feature-label">روز هفته:</span>
+                        </div>
+                        <div class="col-6 mb-2 text-end">
+                            ${dayTranslations[features.Day]}
+                        </div>
+                        
+                        <div class="col-6 mb-2">
+                            <span class="feature-label">ساعت کلاس:</span>
+                        </div>
+                        <div class="col-6 mb-2 text-end">
+                            ${features.Time}
+                        </div>
+                        
+                        <div class="col-6 mb-2">
+                            <span class="feature-label">وضعیت استاد:</span>
+                        </div>
+                        <div class="col-6 mb-2 text-end">
+                            ${professorTranslations[features.Professor_Status]}
+                        </div>
+                        
+                        <div class="col-6 mb-2">
+                            <span class="feature-label">تعطیل رسمی:</span>
+                        </div>
+                        <div class="col-6 mb-2 text-end">
+                            ${features.Is_Holiday ? 'بله' : 'خیر'}
+                        </div>
+                    </div>
+                `;
+                $('#features-info').html(featuresHTML);
+                
+                // Show results
+                $('#results-container').show();
+            },
+            error: function(error) {
+                console.error('Error:', error);
+                $('#loading-container').hide();
+                alert('خطا در پردازش درخواست. لطفا دوباره تلاش کنید.');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
