@@ -91,8 +91,12 @@ def generate_training_data(num_samples=1000, seed=42):
         # Determine if class is held based on rules
         held = True
         
-        # Weekend rule
-        if day in ['Saturday', 'Sunday']:
+        # Weekend rule - In Iranian academic schedule, Friday is the weekend
+        if day == 'Friday':
+            held = False
+        
+        # Thursday rule - Lower probability of classes on Thursday
+        if day == 'Thursday' and np.random.random() < 0.3:  # 30% chance of no class on Thursday
             held = False
         
         # Weather rule
